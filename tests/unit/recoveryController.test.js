@@ -19,8 +19,10 @@ describe('recoveryController', () => {
 
     it('listActions - success for admin', async () => {
         const mockActions = [{ _id: 'a1', note: 'n' }];
-        const populateMock = jest.fn().mockResolvedValue(mockActions);
-        RecoveryAction.find.mockReturnValue({ populate: populateMock });
+        const sortMock = jest.fn().mockResolvedValue(mockActions);
+        const populateActionBy = jest.fn().mockReturnValue({ sort: sortMock });
+        const populateInvoice = jest.fn().mockReturnValue({ populate: populateActionBy });
+        RecoveryAction.find.mockReturnValue({ populate: populateInvoice });
 
         const req = { user: { role: 'admin' } };
         const res = mockRes();
@@ -28,7 +30,7 @@ describe('recoveryController', () => {
         await listActions(req, res);
 
         expect(RecoveryAction.find).toHaveBeenCalledWith({});
-        expect(populateMock).toHaveBeenCalled();
+        expect(populateInvoice).toHaveBeenCalled();
         expect(res.json).toHaveBeenCalledWith(mockActions);
     });
     
@@ -45,8 +47,10 @@ describe('recoveryController', () => {
       select: jest.fn().mockResolvedValue(invoices)
     });
 
-    const populateMock = jest.fn().mockResolvedValue(actions);
-    RecoveryAction.find.mockReturnValue({ populate: populateMock });
+    const sortMock = jest.fn().mockResolvedValue(actions);
+    const populateActionBy = jest.fn().mockReturnValue({ sort: sortMock });
+    const populateInvoice = jest.fn().mockReturnValue({ populate: populateActionBy });
+    RecoveryAction.find.mockReturnValue({ populate: populateInvoice });
 
     const req = { user: { role: 'agent', _id: 'agent1' } };
     const res = mockRes();
@@ -56,7 +60,7 @@ describe('recoveryController', () => {
     expect(Client.find).toHaveBeenCalledWith({ assignedTo: 'agent1' });
     expect(Invoice.find).toHaveBeenCalledWith({ client: { $in: clients.map(c => c._id) } });
     expect(RecoveryAction.find).toHaveBeenCalledWith({ invoice: { $in: invoices.map(i => i._id) } });
-    expect(populateMock).toHaveBeenCalledWith({
+    expect(populateInvoice).toHaveBeenCalledWith({
       path: 'invoice',
       populate: { path: 'client' }
     });
@@ -72,6 +76,7 @@ describe('recoveryController', () => {
       save: jest.fn().mockResolvedValue(true) 
     };
     RecoveryAction.mockImplementation(() => mockActionInstance);
+    Invoice.findById.mockReturnValue({ populate: jest.fn().mockResolvedValue(null) });
 
     const req = { body: payload };
     const res = mockRes();
@@ -80,7 +85,10 @@ describe('recoveryController', () => {
 
     expect(mockActionInstance.save).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(201);
-    expect(res.json).toHaveBeenCalledWith(mockActionInstance);
+    expect(res.json).toHaveBeenCalledWith({
+      action: mockActionInstance,
+      notification: { success: false, error: 'Invoice or client not found' }
+    });
   });
 
   it('createAction - error', async () => {
